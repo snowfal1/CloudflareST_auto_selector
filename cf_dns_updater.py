@@ -1,13 +1,13 @@
+import os
+import re
+import io
 import csv
-import time
 import requests
 import json
 import subprocess
 import zipfile
-import os
+from config.config import email, global_api_key, zone_id
 from datetime import datetime
-import re
-import socket
 
 # 清除代理环境变量
 os.environ.pop("HTTP_PROXY", None)
@@ -15,91 +15,85 @@ os.environ.pop("HTTPS_PROXY", None)
 os.environ.pop("http_proxy", None)
 os.environ.pop("https_proxy", None)
 
-# Part1.下载中转节点
-def is_valid_ipv4(ip): 
-    """检查一个字符串是否是有效的IPv4地址"""
-    pattern = re.compile(r'^(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)$')
-    return bool(pattern.match(ip))
+# 在全局作用域编译正则表达式
+IPV4_PATTERN = re.compile(
+    r'^(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.'
+    r'(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.'
+    r'(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.'
+    r'(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)$'
+)
 
-def get_previously_selected_ips(): #获取上一次优选的ip
-    with open(".\\config\\config.json","r",encoding="utf-8") as config:
-        domains = json.load(config).get("domains")
-        ip_list=[]
-        for key in domains:
-            #获取该域名的ip地址
-            ip = socket.gethostbyname(key)
-            ip_list.append(ip)
-        print("上一次优选的ip已添加到此次优选")
-        return ip_list
-    
-#获取固定ip,可根据喜好添加
-def get_fixed_ips():
-    with open (".\\config\\fixed_ips.txt","r",encoding="utf-8") as file:
+# 判断是否为有效的ipv4地址
+def is_valid_ipv4(ip):
+    return bool(IPV4_PATTERN.match(ip))
+
+# 读取固定IP列表
+def get_fixed_ips(): 
+    with open ("./config/fixed_ips.txt","r",encoding="utf-8") as file:
         ip_list= [ip.strip() for ip in file.readlines()]
         ip_list=filter(is_valid_ipv4,ip_list)
         return list(ip_list)
 
-def fetch_ips(): #下载并生成3ip.txt文件
-    print("下载并生成第三方中转IP列表...")
-    # 设置日期格式
-    current_date = datetime.now().strftime('%Y%m%d')
-    download_folder = os.path.join('3ip_file', current_date)
+# 下载并生成3ip.txt
+def fetch_ips():
+    print("开始下载并生成中转IP列表...")
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+    }
 
-    # 使用requests下载文件
-    response = requests.get("https://zip.baipiao.eu.org/")
-    with open("3ip_file.zip", "wb") as file:
-        file.write(response.content)
+    session = requests.Session()
+    try:
+        response = session.get("https://zip.baipiao.eu.org/", headers=headers)
+        response.raise_for_status()  # 抛出异常
+    except requests.exceptions.RequestException as e:
+        print(f"网络请求异常: {e}")
+        return
+    except Exception as e:
+        print(f"下载ZIP文件时发生错误: {e}")
+        return
 
-    # 使用zipfile解压缩到特定目录
-    if not os.path.exists(download_folder):
-        os.makedirs(download_folder)
+    # 处理ZIP文件内容
+    zip_data = io.BytesIO(response.content)
+    valid_ips = set(get_fixed_ips())  # 初始化为固定IP列表
 
-    with zipfile.ZipFile('3ip_file.zip', 'r') as archive:
-        archive.extractall(download_folder)
+    try:
+        with zipfile.ZipFile(zip_data, 'r') as archive:
+            for file_name in archive.namelist():
+                if file_name.endswith('.txt'):
+                    with archive.open(file_name) as file:
+                        for line in file:
+                            ip = line.decode('utf-8').strip()
+                            if is_valid_ipv4(ip):
+                                valid_ips.add(ip)
+    except zipfile.BadZipFile:
+        print("下载的文件不是有效的ZIP文件")
+        return
 
-    # 整合.txt文件
-    valid_ips = []
-
-    for file_name in os.listdir(download_folder):
-        if file_name.endswith('.txt'):
-            with open(os.path.join(download_folder, file_name), 'r') as infile:
-                for line in infile:
-                    if line=="\n":
-                        continue
-                    ip = line.strip()
-                    if is_valid_ipv4(ip):
-                        valid_ips.append(ip)
-
-    # 添加上一次优选的IP
-    valid_ips = get_previously_selected_ips() + get_fixed_ips() + valid_ips
-    valid_ips = list(set(valid_ips))
-    print(f"共获取{len(valid_ips)}个IP")
-    
-
-    with open(os.path.join(download_folder, 'combined.txt'), 'w') as outfile:
+    # 写入最终的IP文件
+    final_ip_path = '3ip.txt'
+    with open(final_ip_path, 'w') as outfile:
         outfile.write('\n'.join(valid_ips))
 
-    # 如果3ip.txt已经存在，删除它
-    if os.path.exists('3ip.txt'):
-        os.remove('3ip.txt')
+    print(f"IP列表已保存到 {final_ip_path}，共获取 {len(valid_ips)} 个有效IP")
 
-    # 移动到根目录并重命名
-    os.rename(os.path.join(download_folder, 'combined.txt'), '3ip.txt')
+    # 清理会话
+    session.close()
 
-    print("此次优选IP已保存到3ip.txt")
-    
-
-# Part3.生成result.csv
+# 筛选并生成result.csv
 def run_cloudflare_speedtest():
     print("测速并生成result.csv...")
-    with open('.\\config\\cmd.txt', 'r') as file:
+    with open('./config/cmd.txt', 'r') as file:
         cmd = file.readline().strip().split()
     cmd.extend(['-p', '0'])
     subprocess.run(cmd)
 
     print("测速完成，生成result.csv文件")
 
-def get_ips():  # 读取result.csv文件中的IPs
+# 读取result.csv文件中的IP地址
+def get_ips():  
     ips = []
     with open("result.csv", "r",encoding="utf-8") as csvfile:
         csvreader = csv.reader(csvfile)
@@ -108,24 +102,54 @@ def get_ips():  # 读取result.csv文件中的IPs
             ips.append(row[0])
         return ips
 
+# 获取Cloudflare DNS记录
+def fetch_cloudflare_records():
+    url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records?page=1&per_page=20&order=type&direction=asc"
+    headers = {
+        "X-Auth-Email": email,
+        "X-Auth-Key": global_api_key,
+        "Content-Type": "application/json"
+    }
 
-# Part4.更新Cloudflare DNS记录
-def load_config(): # 读取config.json文件
-    with open("config\\config.json", "r", encoding="utf-8") as file:
-        config = json.load(file)
-        email = config.get("email")
-        global_api_key = config.get("global_api_key")
-        zone_id = config.get("zone_id")
-        domains = config.get("domains")
-        if not email or not global_api_key or not zone_id or not domains:
-            print("错误: config.json文件中缺少必要的key！")
-            exit()
-    return email, global_api_key, zone_id, domains
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  
+    except requests.exceptions.RequestException as e:
+        print(f"请求错误: {e}")
+        return {}
 
+    domains_details = response.json()
+    results = domains_details.get("result", [])
+
+    try:
+        with open("./config/domains.txt", "r", encoding="utf-8") as file:
+            domains_list = [line.strip() for line in file if line.strip()]
+    except FileNotFoundError:
+        print("domains.txt文件不存在")
+        return {}
+    except Exception as e:
+        print(f"读取domains.txt时发生错误: {e}")
+        return {}
+    
+    record_ids = {result["name"]: result["id"] for result in results if result["name"] in domains_list}
+    print(f"已获取 {len(record_ids)} 个Cloudflare DNS记录")
+
+    return record_ids
+
+# 获取config
+def load_config_and_records():
+    # 确保所有必要的配置项都存在
+    if not email or not global_api_key or not zone_id:
+        print("错误: 缺少必要的配置信息！")
+        exit()
+
+    return email, global_api_key, zone_id, fetch_cloudflare_records()
+
+# 更新Cloudflare DNS记录
 def update_cloudflare_dns(email, global_api_key, zone_id, domains):
     print("更新Cloudflare DNS记录...")
-    ips = get_ips()  # 读取result.csv文件中的IPs
-    if len(ips)>20: #下载速度为0，请尝试更换测速地址
+    ips = get_ips()
+    if len(ips)>10: 
         return domains
     res_domains=domains.copy() #复制domains字典
     for idx, (domain, record_id) in enumerate(domains.items()):
@@ -156,23 +180,24 @@ def update_cloudflare_dns(email, global_api_key, zone_id, domains):
         print(response.json())
     return res_domains  # 返回未更新的域名
 
+# 主函数
 def main():
     fetch_ips()  # 下载并生成3ip.txt文件
-    print("中转节点下载完成，开始筛选...")
+    print("中转IP下载完成，开始筛选...")
     run_cloudflare_speedtest()  # 生成result.csv文件
 
-    email, global_api_key, zone_id, domains = load_config() # 读取config.json文件
+    email, global_api_key, zone_id, domains = load_config_and_records() # 读取config.json文件
     domains = update_cloudflare_dns(email, global_api_key, zone_id, domains)
     while domains:
         print("未更新的域名: ", domains)
-        print("正在重新测速并更新...")
-        run_cloudflare_speedtest()  # 生成result.csv文件
+        print("\n")
+        print("正在重新测速并更新剩余的域名...")
+        run_cloudflare_speedtest()  # 重新生成result.csv文件
         domains = update_cloudflare_dns(email, global_api_key, zone_id, domains)
     
-
-
+# 程序入口
 if __name__=="__main__":
     main()
-    print("10秒后自动退出程序")
-    time.sleep(10)
+    print("3秒后自动退出程序")
+    exit(3)
     
