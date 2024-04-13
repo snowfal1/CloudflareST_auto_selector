@@ -11,7 +11,7 @@
 - Python
 - `requests` 库
 - [CloudflareSpeedTest](https://github.com/XIU2/CloudflareSpeedTest/releases)
-- 在`Cloudflare`上解析好的域名
+- 在 `Cloudflare`上解析好的域名
 
 ### 安装:
 
@@ -25,9 +25,10 @@
 
 #### config文件夹配置:
 
-1. 配置`config.py` 文件前，请在Cloudflare上创建一定数量的域名解析(10个以下)，并将域名按行排列复制到 `domains.txt` 文件中，**注意不要开启域名代理服务(小云朵）！**
+1. 配置 `config.py` 文件前，请在Cloudflare上创建一定数量的域名解析(10个以下)，并将域名按行排列复制到 `domains.txt` 文件中，**注意不要开启域名代理服务(小云朵）！**
 2. `config.json` 中，`email`为你的Cloudflare账户邮箱，`global_api_key` 可在Cloudflare官网的  [用户API 令牌](https://dash.cloudflare.com/profile/api-tokens)  界面查看并复制，`zone_id` 在**对应域名管理概述页面的右下角**找到区域 ID复制到。
-3. `cmd.txt` 中存放默认的  `CloudflareST.exe` 执行指令，需注意 `-f 3ip.txt -p 0` 指令为必须存在的指令，分别指向了IP文件与程序结束指令，其中-url 后面的参数可自行替换为自己常用的测速地址。默认的 `-dn 5 -tl 200 -sl 10` 指令意味着只筛选5个最终ip(`-dn 5`)，延迟取200以下(`-tl 200`)，下载速度取10 MB/S 以上(`-sl 10`)，可根据需求自行更改添加，相关文档  [CloudflareSpeedTest](https://github.com/XIU2/CloudflareSpeedTest?tab=readme-ov-file#-%E8%BF%9B%E9%98%B6%E4%BD%BF%E7%94%A8) 。
+3. `cmd.txt` 中存放默认的  `CloudflareST.exe` 执行指令，需注意 `-f 3ip.txt -p 0` 指令为必须存在的指令，分别指向了IP文件与程序结束指令，其中-url 后面的参数可自行替换为自己常用的测速地址。默认的 `-dn 5 -tl 200 -sl 10` 指令意味着只筛选5个最终ip(`-dn 5`)，延迟取200以下(`-tl 200`)，下载速度取10 MB/S 以上(`-sl 10`)，可根据需求自行更改添加，相关文档  [CloudflareSpeedTest](https://github.com/XIU2/CloudflareSpeedTest?tab=readme-ov-file#-%E8%BF%9B%E9%98%B6%E4%BD%BF%E7%94%A8)
+4. (可选)`fixed_ips.txt` 为额外固定的IP，可自行添加，程序每次运行都会使用你设置的IP。
 
 #### 使用:
 
@@ -56,8 +57,8 @@
 
 **Q**: 程序执行时出现错误怎么办?
 
-**A**: 请检查你的`config.py`是否已按照文档中的说明进行了正确配置。
+**A**: 请检查你的 `config.py`是否已按照文档中的说明进行了正确配置。
 
 **Q**: `CloudflareST.exe`程序应该怎么放置?
 
-**A**: 放置在根目录即可，仅需要`CloudflareST.exe` 一个可执行文件即可。
+**A**: 放置在根目录即可，仅需要 `CloudflareST.exe` 一个可执行文件即可。
