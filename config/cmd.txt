@@ -1,1 +1,1 @@
-CloudflareST.exe -url https://speed.cloudflare.com/__down?bytes=200000000 -sl 10 -tl 200 -dn 10  -p 0 -f 3ip.txt
+CloudflareST.exe -url https://speed.cloudflare.com/__down?bytes=200000000 -p 0 -f 3ip.txt -dn 5 -tl 200 -sl 10
