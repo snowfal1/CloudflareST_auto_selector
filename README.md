@@ -34,6 +34,7 @@
 
 1. 在项目根目录下运行 `python cf_dns_updater.py`。
 2. 程序将自动下载中转IP、筛选IP、测速，并更新DNS记录。
+3. 如果使用打包版本，配置好`config.py`与`domains.txt`之后，直接运行`cf_dns_updater.exe` 。
 
 ---
 
